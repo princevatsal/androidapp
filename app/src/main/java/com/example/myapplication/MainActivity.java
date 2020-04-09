@@ -2,29 +2,32 @@ package com.example.myapplication;
 
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.AppCompatImageView;
 
 import android.app.Service;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.ContactsContract;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.Toast;
 
+import com.bumptech.glide.Glide;
 import com.nex3z.notificationbadge.NotificationBadge;
 import com.txusballesteros.bubbles.BubbleLayout;
 import com.txusballesteros.bubbles.BubblesManager;
 import com.txusballesteros.bubbles.OnInitializedCallback;
-
 public class MainActivity extends AppCompatActivity {
     private BubblesManager bubblesManager;
     private NotificationBadge mBadge;
     private int MY_PERMISSION=1000;
-    public  de.hdodenhof.circleimageview.CircleImageView Icon;
+    public ImageView Icon;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -72,7 +75,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onBubbleClick(BubbleLayout bubble) {
                 Toast.makeText(MainActivity.this,"Clicked",Toast.LENGTH_SHORT).show();
-
+                ClickIcon(bubble);
 
             }
         });
@@ -104,4 +107,11 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     }
+
+    public void ClickIcon(View view) {
+        AppCompatImageView  imageView=(AppCompatImageView) view.findViewById(R.id.avatar);
+        System.out.println(imageView);
+        imageView.setImageResource(R.drawable.bubble_icon);
+        imageView.setImageResource(R.drawable.stop);
+      }
 }

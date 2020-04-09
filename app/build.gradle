@@ -29,4 +29,6 @@ dependencies {
     implementation 'com.github.txusballesteros:bubbles-for-android:develop-SNAPSHOT'
     implementation 'com.nex3z:notification-badge:0.2.0'
     implementation 'de.hdodenhof:circleimageview:2.1.0'
+    implementation 'com.github.bumptech.glide:glide:4.11.0'
+    annotationProcessor 'com.github.bumptech.glide:compiler:4.11.0'
 }
