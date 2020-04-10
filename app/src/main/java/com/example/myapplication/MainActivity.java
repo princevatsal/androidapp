@@ -12,11 +12,13 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.pm.PackageManager;
 import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.IBinder;
 import android.provider.ContactsContract;
 import android.provider.Settings;
@@ -34,7 +36,6 @@ import com.nex3z.notificationbadge.NotificationBadge;
 import com.txusballesteros.bubbles.BubbleLayout;
 import com.txusballesteros.bubbles.BubblesManager;
 import com.txusballesteros.bubbles.OnInitializedCallback;
-
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -42,9 +43,18 @@ import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
-import android.content.ServiceConnection;
+import java.security.Permission;
+import java.security.Permissions;
 
-public class MainActivity extends AppCompatActivity {
+import android.content.ServiceConnection;
+import com.acrcloud.rec.*;
+import com.acrcloud.rec.utils.ACRCloudLogger;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+public class MainActivity extends AppCompatActivity implements IACRCloudListener, IACRCloudRadioMetadataListener{
     private BubblesManager bubblesManager;
     private NotificationBadge mBadge;
     private int MY_PERMISSION=1000;
@@ -61,6 +71,37 @@ public class MainActivity extends AppCompatActivity {
     // Requesting permission to RECORD_AUDIO
     private boolean permissionToRecordAccepted = false;
     private String [] permissions = {Manifest.permission.RECORD_AUDIO};
+    //for acr demo
+
+    private final static String TAG = "MainActivity";
+
+    private TextView mVolume, mResult, tv_time;
+
+    private boolean mProcessing = false;
+    private boolean mAutoRecognizing = false;
+    private boolean initState = false;
+
+    private MediaPlayer mediaPlayer = new MediaPlayer();
+    private boolean isPlaying = false;
+
+    private String path = "";
+
+    private long startTime = 0;
+    private long stopTime = 0;
+
+    private final int PRINT_MSG = 1001;
+
+    private ACRCloudConfig mConfig = null;
+    private ACRCloudClient mClient = null;
+
+    private static final int REQUEST_EXTERNAL_STORAGE = 1;
+    private static String[] PERMISSIONS = {
+            Manifest.permission.ACCESS_NETWORK_STATE,
+            Manifest.permission.ACCESS_WIFI_STATE,
+            Manifest.permission.INTERNET,
+            Manifest.permission.RECORD_AUDIO
+    };
+    //
 
     //sending vars
     TextView messageText;
@@ -135,8 +176,115 @@ public class MainActivity extends AppCompatActivity {
 //                        ViewGroup.LayoutParams.WRAP_CONTENT,
 //                        0));
 //        setContentView(ll);
-    }
+        //acr demo
+        mResult = (TextView) findViewById(R.id.result);
+        path = Environment.getExternalStorageDirectory().toString()
+                + "/acrcloud";
+        Log.e(TAG, path);
 
+        File file = new File(path);
+        if(!file.exists()){
+            file.mkdirs();
+        }
+
+        verifyPermissions();
+
+        this.mConfig = new ACRCloudConfig();
+
+        this.mConfig.acrcloudListener = this;
+        this.mConfig.context = this;
+
+        // Please create project in "http://console.acrcloud.cn/service/avr".
+        this.mConfig.host = "identify-ap-southeast-1.acrcloud.com";
+        this.mConfig.accessKey = "96569ce32f677be9ef5da22319655fb8";
+        this.mConfig.accessSecret = "WNW0o352IyBq5qdnohGARcmlHsl9G6G4oTet7EgQ";
+
+        // auto recognize access key
+        this.mConfig.hostAuto = "";
+        this.mConfig.accessKeyAuto = "";
+        this.mConfig.accessSecretAuto = "";
+
+        this.mConfig.recorderConfig.rate = 8000;
+        this.mConfig.recorderConfig.channels = 1;
+
+        this.mConfig.acrcloudPartnerDeviceInfo = new IACRCloudPartnerDeviceInfo() {
+            @Override
+            public String getGPS() {
+                return null;
+            }
+
+            @Override
+            public String getRadioFrequency() {
+                return null;
+            }
+
+            @Override
+            public String getDeviceId() {
+                return "";
+            }
+
+            @Override
+            public String getDeviceModel() {
+                return null;
+            }
+        };
+
+        // If you do not need volume callback, you set it false.
+        this.mConfig.recorderConfig.isVolumeCallback = true;
+
+        this.mClient = new ACRCloudClient();
+        ACRCloudLogger.setLog(true);
+
+        this.initState = this.mClient.initWithConfig(this.mConfig);
+        //
+    }
+    @Override
+    public void onVolumeChanged(double volume) {
+        long time = (System.currentTimeMillis() - startTime) / 1000;
+        Log.i("logs","vol change");
+    }
+    @Override
+    public void onRadioMetadataResult(String s) {
+        mResult.setText(s);
+    }
+    public void start() {
+        if (!this.initState) {
+            Toast.makeText(this, "init error", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (!mProcessing) {
+            mProcessing = true;
+            mResult.setText("");
+            if (this.mClient == null || !this.mClient.startRecognize()) {
+                mProcessing = false;
+                mResult.setText("start error!");
+            }
+            startTime = System.currentTimeMillis();
+        }
+    }
+    public void cancel() {
+        if (mProcessing && this.mClient != null) {
+            this.mClient.cancel();
+        }
+
+        this.reset();
+    }
+    public void reset() {
+        mResult.setText("");
+        mProcessing = false;
+    }
+    public void verifyPermissions() {
+
+        for (int i=0; i<PERMISSIONS.length; i++) {
+            int permission = ActivityCompat.checkSelfPermission(this, PERMISSIONS[i]);
+            if (permission != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, PERMISSIONS,
+                        REQUEST_EXTERNAL_STORAGE);
+                break;
+            }
+        }
+    }
     public int uploadFile(String sourceFileUri) {
 
 
@@ -350,13 +498,13 @@ public class MainActivity extends AppCompatActivity {
         System.out.println(imageView);
         System.out.println("clicked");
         if(ct){
-            onRecord(ct);
+            start();
             System.out.println("started recording");
             ct=!ct;
             imageView.setImageResource(R.drawable.stop);
         }
         else{
-            onRecord(ct);
+            cancel();
             ct=!ct;
             System.out.println("stopped recording");
             imageView.setImageResource(R.drawable.mic);
@@ -471,5 +619,53 @@ public class MainActivity extends AppCompatActivity {
 //            player.release();
 //            player = null;
 //        }
+    }
+    @Override
+    public void onResult(ACRCloudResult results) {
+        this.reset();
+
+        // If you want to save the record audio data, you can refer to the following codes.
+	/*
+	byte[] recordPcm = results.getRecordDataPCM();
+        if (recordPcm != null) {
+            byte[] recordWav = ACRCloudUtils.pcm2Wav(recordPcm, this.mConfig.recorderConfig.rate, this.mConfig.recorderConfig.channels);
+            ACRCloudUtils.createFileWithByte(recordWav, path + "/" + "record.wav");
+        }
+	*/
+
+        String result = results.getResult();
+
+        String tres = "\n";
+
+        try {
+            JSONObject j = new JSONObject(result);
+            JSONObject j1 = j.getJSONObject("status");
+            int j2 = j1.getInt("code");
+            if(j2 == 0){
+                JSONObject metadata = j.getJSONObject("metadata");
+                //
+                if (metadata.has("music")) {
+                    JSONArray musics = metadata.getJSONArray("music");
+                    for(int i=0; i<musics.length(); i++) {
+                        JSONObject tt = (JSONObject) musics.get(i);
+                        String title = tt.getString("title");
+                        JSONArray artistt = tt.getJSONArray("artists");
+                        JSONObject art = (JSONObject) artistt.get(0);
+                        String artist = art.getString("name");
+                        tres = tres + (i+1) + ".  Title: " + title + "    Artist: " + artist + "\n";
+                    }
+                }
+
+                tres = tres + "\n\n" + result;
+            }else{
+                tres = result;
+            }
+        } catch (JSONException e) {
+            tres = result;
+            e.printStackTrace();
+        }
+        Log.i("logs",tres);
+        mResult.setText(tres);
+        startTime = System.currentTimeMillis();
     }
 }
