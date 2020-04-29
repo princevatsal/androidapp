@@ -1,12 +1,12 @@
 package com.example.myapplication;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.AppCompatImageView;
+import androidx.cardview.widget.CardView;
 import androidx.core.app.ActivityCompat;
 import android.Manifest;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.drawable.Animatable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -15,35 +15,36 @@ import android.provider.Settings;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
-import android.widget.Button;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import com.acrcloud.rec.ACRCloudClient;
+import com.acrcloud.rec.ACRCloudConfig;
+import com.acrcloud.rec.ACRCloudResult;
+import com.acrcloud.rec.IACRCloudListener;
+import com.acrcloud.rec.IACRCloudPartnerDeviceInfo;
+import com.acrcloud.rec.IACRCloudRadioMetadataListener;
+import com.acrcloud.rec.utils.ACRCloudLogger;
 import com.nex3z.notificationbadge.NotificationBadge;
 import com.txusballesteros.bubbles.BubbleLayout;
 import com.txusballesteros.bubbles.BubblesManager;
 import com.txusballesteros.bubbles.OnInitializedCallback;
-import java.io.File;
-import com.acrcloud.rec.*;
-import com.acrcloud.rec.utils.ACRCloudLogger;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-import androidx.cardview.widget.CardView;
 
-public class MainActivity extends AppCompatActivity implements IACRCloudListener, IACRCloudRadioMetadataListener{
-    private BubblesManager bubblesManager;
-    private NotificationBadge mBadge;
+import java.io.File;
+
+public class MainActivity extends AppCompatActivity implements IACRCloudListener, IACRCloudRadioMetadataListener {
+
+    //declaring class variable
     private int MY_PERMISSION=1000;
-    private final static String TAG = "MainActivity";
-    private TextView  mResult,titlebtn,artistbtn;
-    private boolean mProcessing = false;
-    private boolean initState = false;
-    private String path = "";
-    private long startTime = 0;
-    private ACRCloudConfig mConfig = null;
-    private ACRCloudClient mClient = null;
     private static final int REQUEST_EXTERNAL_STORAGE = 1;
     private static String[] PERMISSIONS = {
             Manifest.permission.ACCESS_NETWORK_STATE,
@@ -51,52 +52,90 @@ public class MainActivity extends AppCompatActivity implements IACRCloudListener
             Manifest.permission.INTERNET,
             Manifest.permission.RECORD_AUDIO
     };
-    Intent ser;
+    //declaring Bubble Variables
+    private BubblesManager bubblesManager;
+    private NotificationBadge mBadge;
+    private TextView  titlebtn,artistbtn,mResult;
+    private boolean isrecording=false;
+    private long startTime = 0;
+    private ACRCloudConfig mConfig = null;
+    private ACRCloudClient mClient = null;
+    private boolean mProcessing = false;
+    private boolean initState = false;
+    private String path = "";
     BubbleLayout getBubble;
+
+    //
+    Intent ser;
+    //
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
-        //setting up first bubble and add bubble button
         getPermission();
+        verifyPermissions();
         initBubble();
-        Button btnAdd=(Button) findViewById(R.id.btnAddBubble);
-        btnAdd.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                addNewBubble();
-            }
-        });
-        //
+        initAcr();
+        System.out.println("bubble called");
+    }
+    public void verifyPermissions() {
 
-//        LinearLayout ll = new LinearLayout(this);
-//        recordButton = new RecordButton(this);
-//        ll.addView(recordButton,
-//                new LinearLayout.LayoutParams(
-//                        ViewGroup.LayoutParams.WRAP_CONTENT,
-//                        ViewGroup.LayoutParams.WRAP_CONTENT,
-//                        0));
-//        playButton = new PlayButton(this);
-//        ll.addView(playButton,
-//                new LinearLayout.LayoutParams(
-//                        ViewGroup.LayoutParams.WRAP_CONTENT,
-//                        ViewGroup.LayoutParams.WRAP_CONTENT,
-//                        0));
-//        setContentView(ll);
-        //acr demo
+        for (int i=0; i<PERMISSIONS.length; i++) {
+            int permission = ActivityCompat.checkSelfPermission(this, PERMISSIONS[i]);
+            if (permission != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, PERMISSIONS,
+                        REQUEST_EXTERNAL_STORAGE);
+                break;
+            }
+        }
+    }
+    @Override
+    protected void onDestroy(){
+        super.onDestroy();
+        stopService(ser);
+        Toast.makeText(MainActivity.this, "Service Un-Binded", Toast.LENGTH_LONG).show();
+        bubblesManager.recycle();
+    }
+    public void getPermission(){
+        if(Build.VERSION.SDK_INT>=23){
+            if(!Settings.canDrawOverlays(this)){
+                Intent intent=new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:" +getPackageName()));
+                startActivityForResult(intent,MY_PERMISSION);
+            }
+            else{
+                Intent it=new Intent(this, Service.class);
+                ser=it;
+                startService(it);
+            }
+        }
+    }
+    @Override
+    public void onStop() {
+        super.onStop();
+    }
+    //Bubble Functions
+    private void initBubble() {
+        bubblesManager=new BubblesManager.Builder(this)
+                .setInitializationCallback(new OnInitializedCallback() {
+                    @Override
+                    public void onInitialized() {
+                        System.out.println("addming bubble ");
+                        addNewBubble();
+                    }
+                }).build();
+        bubblesManager.initialize();
+    }
+    private void initAcr(){
         mResult = (TextView) findViewById(R.id.result);
         path = Environment.getExternalStorageDirectory().toString()
                 + "/acrcloud";
-        Log.e(TAG, path);
+        Log.e("logs", path);
 
         File file = new File(path);
         if(!file.exists()){
             file.mkdirs();
         }
-
-        verifyPermissions();
-
         this.mConfig = new ACRCloudConfig();
         this.mConfig.acrcloudListener = this;
         this.mConfig.context = this;
@@ -136,13 +175,57 @@ public class MainActivity extends AppCompatActivity implements IACRCloudListener
         ACRCloudLogger.setLog(true);
         this.initState = this.mClient.initWithConfig(this.mConfig);
     }
-    @Override
-    public void onVolumeChanged(double volume) {
-        Log.i("logs","vol change");
+    public void addNewBubble() {
+       BubbleLayout bubbleView=(BubbleLayout) LayoutInflater.from(this)
+                .inflate(R.layout.bubble_layout,null);
+        mBadge=(NotificationBadge) bubbleView.findViewById(R.id.count);
+        mBadge.setText(" x ");
+        bubbleView.setOnBubbleRemoveListener(new BubbleLayout.OnBubbleRemoveListener(){
+            @Override
+            public void onBubbleRemoved(BubbleLayout bubble){
+                Toast.makeText(MainActivity.this,"Removed",Toast.LENGTH_SHORT).show();
+            }
+        });
+        bubbleView.setOnBubbleClickListener(new BubbleLayout.OnBubbleClickListener() {
+            @Override
+            public void onBubbleClick(BubbleLayout bubble) {
+                Toast.makeText(MainActivity.this,"Clicked",Toast.LENGTH_SHORT).show();
+                titlebtn=(TextView) bubble.findViewById(R.id.title);
+                artistbtn=(TextView) bubble.findViewById(R.id.artist);
+                getBubble=bubble;
+                ClickIcon(bubble);
+            }
+        });
+        bubbleView.setShouldStickToWall(true);
+        bubblesManager.addBubble(bubbleView,60,20);
+
     }
-    @Override
-    public void onRadioMetadataResult(String s) {
-        mResult.setText(s);
+    public void notification(View view) {
+        Toast.makeText(this,"Notification",Toast.LENGTH_SHORT).show();
+        bubblesManager.recycle();
+    }
+    public void ClickIcon(View view) {
+
+        ImageView imageView=(ImageView) view.findViewById(R.id.avatar);
+        CardView card=(CardView) view.findViewById(R.id.card);
+        System.out.println(imageView);
+        System.out.println("clicked");
+        System.out.println("changed view");
+        Animation aniRotate = AnimationUtils.loadAnimation(getApplicationContext(),R.anim.rotate);
+        imageView.startAnimation(aniRotate);
+        if(isrecording){
+            cancel();
+            isrecording=!isrecording;
+            System.out.println("stopped recording");
+            imageView.setImageResource(R.drawable.play);
+            card.setVisibility(View.INVISIBLE);
+        }else{
+                start();
+            System.out.println("started recording");
+            isrecording=!isrecording;
+            imageView.setImageResource(R.drawable.mic);
+            card.setVisibility(View.INVISIBLE);
+        }
     }
     public void start() {
         if (!this.initState) {
@@ -171,139 +254,17 @@ public class MainActivity extends AppCompatActivity implements IACRCloudListener
         mResult.setText("");
         mProcessing = false;
     }
-    public void verifyPermissions() {
-
-        for (int i=0; i<PERMISSIONS.length; i++) {
-            int permission = ActivityCompat.checkSelfPermission(this, PERMISSIONS[i]);
-            if (permission != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this, PERMISSIONS,
-                        REQUEST_EXTERNAL_STORAGE);
-                break;
-            }
-        }
-    }
-    private void initBubble() {
-        //
-        //
-
-        bubblesManager=new BubblesManager.Builder(this)
-                .setInitializationCallback(new OnInitializedCallback() {
-                    @Override
-                    public void onInitialized() {
-                        addNewBubble();
-                    }
-                }).build();
-        bubblesManager.initialize();
-    }
-
-    private void addNewBubble() {
-        BubbleLayout bubbleView=(BubbleLayout) LayoutInflater.from(this)
-                .inflate(R.layout.bubble_layout,null);
-        mBadge=(NotificationBadge) bubbleView.findViewById(R.id.count);
-        mBadge.setText(" x ");
-
-
-        bubbleView.setOnBubbleRemoveListener(new BubbleLayout.OnBubbleRemoveListener(){
-            @Override
-            public void onBubbleRemoved(BubbleLayout bubble){
-                Toast.makeText(MainActivity.this,"Removed",Toast.LENGTH_SHORT).show();
-            }
-        });
-        bubbleView.setOnBubbleClickListener(new BubbleLayout.OnBubbleClickListener() {
-            @Override
-            public void onBubbleClick(BubbleLayout bubble) {
-                Toast.makeText(MainActivity.this,"Clicked",Toast.LENGTH_SHORT).show();
-                titlebtn=(TextView) bubble.findViewById(R.id.title);
-                artistbtn=(TextView) bubble.findViewById(R.id.artist);
-                getBubble=bubble;
-                ClickIcon(bubble);
-
-            }
-        });
-        bubbleView.setShouldStickToWall(true);
-        bubblesManager.addBubble(bubbleView,60,20);
-
-    }
-
     @Override
-    protected void onDestroy(){
-        super.onDestroy();
-        bubblesManager.recycle();
-        stopService(ser);
-        Toast.makeText(MainActivity.this, "Service Un-Binded", Toast.LENGTH_LONG).show();
+    public void onVolumeChanged(double volume) {
+        Log.i("logs","vol change");
     }
-
-    public void notification(View view) {
-        Toast.makeText(MainActivity.this,"Notification",Toast.LENGTH_SHORT).show();
-        bubblesManager.recycle();
-    }
-    public void getPermission(){
-        if(Build.VERSION.SDK_INT>=23){
-            if(!Settings.canDrawOverlays(this)){
-                Intent intent=new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                        Uri.parse("package:" +getPackageName()));
-                startActivityForResult(intent,MY_PERMISSION);
-            }
-            else{
-                Intent it=new Intent(this, Service.class);
-                ser=it;
-                startService(it);
-            }
-        }
-    }
-    private boolean ct=true;
-    private boolean isrecording=false;
-    public void ClickIcon(View view) {
-        AppCompatImageView  imageView=(AppCompatImageView) view.findViewById(R.id.avatar);
-        CardView card=(CardView) view.findViewById(R.id.card);
-        System.out.println(imageView);
-        System.out.println("clicked");
-        Animation aniRotate = AnimationUtils.loadAnimation(getApplicationContext(),R.anim.rotate);
-        imageView.startAnimation(aniRotate);
-//        if(ct){
-//            start();
-//            System.out.println("started recording");
-//            ct=!ct;
-//            imageView.setImageResource(R.drawable.mic);
-//        }
-//        else{
-//            cancel();
-//            ct=!ct;
-//            System.out.println("stopped recording");
-//            imageView.setImageResource(R.drawable.play);
-//        }
-        if(isrecording){
-            cancel();
-            isrecording=!isrecording;
-            System.out.println("stopped recording");
-            imageView.setImageResource(R.drawable.play);
-            card.setVisibility(View.INVISIBLE);
-        }else{
-            start();
-            System.out.println("started recording");
-            isrecording=!isrecording;
-            imageView.setImageResource(R.drawable.mic);
-            card.setVisibility(View.INVISIBLE);
-        }
-      }
-
     @Override
-    public void onStop() {
-        super.onStop();
-//        if (recorder != null) {
-//            recorder.release();
-//            recorder = null;
-//        }
-//
-//        if (player != null) {
-//            player.release();
-//            player = null;
-//        }
+    public void onRadioMetadataResult(String s) {
+        mResult.setText(s);
     }
     @Override
     public void onResult(ACRCloudResult results) {
         this.reset();
-        CardView card=(CardView) getBubble.findViewById(R.id.card);
         // If you want to save the record audio data, you can refer to the following codes.
 	/*
 	byte[] recordPcm = results.getRecordDataPCM();
@@ -360,18 +321,57 @@ public class MainActivity extends AppCompatActivity implements IACRCloudListener
         titlebtn.setText(ttt);
         artistbtn.setText(arr);
         //setting icon and state
-        card.setVisibility(View.VISIBLE);
-        AppCompatImageView  imageView=(AppCompatImageView) getBubble.findViewById(R.id.avatar);
+        LinearLayout linearLayout = (LinearLayout) getBubble.findViewById(R.id.bubbleCover);
+        ImageView  imageView=(ImageView) getBubble.findViewById(R.id.avatar);
+        CardView card=(CardView) getBubble.findViewById(R.id.card);
+        maximize();
+        System.out.println("are the set");
         isrecording=false;
+            imageView.setImageResource(R.drawable.play);
         System.out.println("stopped recording");
-        imageView.setImageResource(R.drawable.play);
+        card.setOnFocusChangeListener(new CardView.OnFocusChangeListener() {
+            @Override
+            public void onFocusChange(View v, boolean hasFocus) {
+                if(hasFocus){
+                    Toast.makeText(getApplicationContext(), "got the focus", Toast.LENGTH_LONG).show();
+                }else {
+                    Toast.makeText(getApplicationContext(), "lost the focus", Toast.LENGTH_LONG).show();
+                }
+            }
+        });
         ttt="";
         arr="";
         startTime = System.currentTimeMillis();
     }
 
-    public void playsong(View view) {
-        System.out.println("***********************************playing song");
-        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("http://www.youtube.com/watch?v=cxLG2wtE7TM")));
+    public void cardClick(View view) {
+        System.out.println("do nothing ");
     }
+
+    public void goHome(View view) {
+        minimize();
+    }
+    //
+    public void minimize(){
+        CardView card=(CardView) getBubble.findViewById(R.id.card);
+        LinearLayout linearLayout = (LinearLayout) getBubble.findViewById(R.id.bubbleCover);
+        linearLayout.getLayoutParams().width = 142;
+        linearLayout.getLayoutParams().height = 142;
+        linearLayout.requestLayout();
+        card.getLayoutParams().width =0;
+        card.getLayoutParams().height = 0;
+        card.requestLayout();
+    }
+    public void  maximize(){
+        CardView card=(CardView) getBubble.findViewById(R.id.card);
+        LinearLayout linearLayout = (LinearLayout) getBubble.findViewById(R.id.bubbleCover);
+        linearLayout.getLayoutParams().width = 0;
+        linearLayout.getLayoutParams().height = 0;
+        linearLayout.requestLayout();
+        card.setVisibility(View.VISIBLE);
+        card.getLayoutParams().width = ViewGroup.LayoutParams.WRAP_CONTENT;;
+        card.getLayoutParams().height = ViewGroup.LayoutParams.WRAP_CONTENT;;
+        card.requestLayout();
+    }
+    
 }
