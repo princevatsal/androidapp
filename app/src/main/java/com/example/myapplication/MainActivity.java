@@ -4,13 +4,16 @@ import androidx.cardview.widget.CardView;
 import androidx.core.app.ActivityCompat;
 import android.Manifest;
 import android.app.Service;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.StrictMode;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -31,6 +34,8 @@ import com.acrcloud.rec.IACRCloudPartnerDeviceInfo;
 import com.acrcloud.rec.IACRCloudRadioMetadataListener;
 import com.acrcloud.rec.utils.ACRCloudLogger;
 import com.nex3z.notificationbadge.NotificationBadge;
+import com.squareup.picasso.Downloader;
+import com.squareup.picasso.Picasso;
 import com.txusballesteros.bubbles.BubbleLayout;
 import com.txusballesteros.bubbles.BubblesManager;
 import com.txusballesteros.bubbles.OnInitializedCallback;
@@ -38,11 +43,20 @@ import com.txusballesteros.bubbles.OnInitializedCallback;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import com.android.volley.*;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
 
 import java.io.File;
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
+
+
+
+
 
 public class MainActivity extends AppCompatActivity implements IACRCloudListener, IACRCloudRadioMetadataListener {
-
     //declaring class variable
     private int MY_PERMISSION=1000;
     private static final int REQUEST_EXTERNAL_STORAGE = 1;
@@ -63,13 +77,15 @@ public class MainActivity extends AppCompatActivity implements IACRCloudListener
     private boolean mProcessing = false;
     private boolean initState = false;
     private String path = "";
+    public String YoutubeUrl="";
     BubbleLayout getBubble;
 
     //
     Intent ser;
+
     //
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected  void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         getPermission();
@@ -77,6 +93,11 @@ public class MainActivity extends AppCompatActivity implements IACRCloudListener
         initBubble();
         initAcr();
         System.out.println("bubble called");
+//        moveTaskToBack(true);
+
+        StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
+        StrictMode.setThreadPolicy(policy);
+
     }
     public void verifyPermissions() {
 
@@ -92,7 +113,7 @@ public class MainActivity extends AppCompatActivity implements IACRCloudListener
     @Override
     protected void onDestroy(){
         super.onDestroy();
-        stopService(ser);
+//        stop+ice(ser);
         Toast.makeText(MainActivity.this, "Service Un-Binded", Toast.LENGTH_LONG).show();
         bubblesManager.recycle();
     }
@@ -102,6 +123,7 @@ public class MainActivity extends AppCompatActivity implements IACRCloudListener
                 Intent intent=new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                         Uri.parse("package:" +getPackageName()));
                 startActivityForResult(intent,MY_PERMISSION);
+
             }
             else{
                 Intent it=new Intent(this, Service.class);
@@ -316,29 +338,101 @@ public class MainActivity extends AppCompatActivity implements IACRCloudListener
             e.printStackTrace();
         }
         Log.i("logs",tres);
-        //setting text
-        mResult.setText(tres);
-        titlebtn.setText(ttt);
-        artistbtn.setText(arr);
+
         //setting icon and state
         LinearLayout linearLayout = (LinearLayout) getBubble.findViewById(R.id.bubbleCover);
-        ImageView  imageView=(ImageView) getBubble.findViewById(R.id.avatar);
+        final ImageView  imageView=(ImageView) getBubble.findViewById(R.id.avatar);
+        final ImageView thumbnail=(ImageView) getBubble.findViewById(R.id.thumbnail);
         CardView card=(CardView) getBubble.findViewById(R.id.card);
-        maximize();
-        System.out.println("are the set");
-        isrecording=false;
-            imageView.setImageResource(R.drawable.play);
-        System.out.println("stopped recording");
-        card.setOnFocusChangeListener(new CardView.OnFocusChangeListener() {
+        //
+        if(ttt!="Not")
+        {
+            final String localttt=ttt;
+        RequestQueue queue = Volley.newRequestQueue(this);
+        String query=ttt+" by "+arr;
+        System.out.println("searching for query:-");
+        System.out.println(query);
+        String url ="https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=1&q="+query+"&key=AIzaSyA4yrKXmfFVMnLaLhCDFTRF8AsAvkbRZ8w";
+
+            final String finalTtt = ttt;
+            StringRequest stringRequest = new StringRequest(Request.Method.GET, url,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        // Display the first 500 characters of the response string.
+                        System.out.println("we Get Response");
+                        JSONObject objj;
+                        JSONArray arr;
+                        JSONObject objj2;
+                        JSONObject snippet;
+                        JSONObject id;
+                        String videoId;
+                        JSONObject thumbnails;
+                        JSONObject def;
+                        String url,title;
+                        try {
+                            objj = new JSONObject(response);
+                            arr=(JSONArray) objj.get("items");
+                            objj2=(JSONObject) arr.get(0);
+                            snippet =(JSONObject) objj2.get("snippet");
+                            id=(JSONObject) objj2.get("id");
+                            videoId=id.get("videoId").toString();
+                            title= snippet.get("title").toString();
+                            thumbnails=(JSONObject) snippet.get("thumbnails");
+                            def=(JSONObject) thumbnails.get("default");
+                            url=def.get("url").toString();
+                            System.out.println(title);
+                            System.out.println(url);
+                            //setting text
+//                          mResult.setText(title);
+                            titlebtn.setText(title);
+                            artistbtn.setText("");
+                            //setting img
+                            System.out.println(localttt);
+                            try {
+                                URL urll = new URL(url);
+                                System.out.println("fetching ");
+                                Bitmap bmp = BitmapFactory.decodeStream(urll.openConnection().getInputStream());
+                                thumbnail.setImageBitmap(bmp);
+                            }catch (IOException E){
+
+                            }
+
+                            //
+                            YoutubeUrl="watch?v="+videoId;
+                            maximize();
+//                          imageView.setImageResource(R.drawable.play);
+
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                            maximize();
+                            titlebtn.setText("Not");
+                            artistbtn.setText("Found");
+
+                            imageView.setImageResource(R.drawable.play);
+                        }
+                    }
+                }, new Response.ErrorListener() {
             @Override
-            public void onFocusChange(View v, boolean hasFocus) {
-                if(hasFocus){
-                    Toast.makeText(getApplicationContext(), "got the focus", Toast.LENGTH_LONG).show();
-                }else {
-                    Toast.makeText(getApplicationContext(), "lost the focus", Toast.LENGTH_LONG).show();
-                }
+            public void onErrorResponse(VolleyError error) {
+                System.out.println("an error occured");
             }
         });
+        // Add the request to the
+            queue.add(stringRequest);
+        }else{
+            System.out.println("seeting 404 ");
+            thumbnail.setImageResource(R.drawable.notfound);
+            YoutubeUrl="";
+            maximize();
+            titlebtn.setText("Not");
+            artistbtn.setText("Found");
+        }
+        //
+        System.out.println("are the set");
+        isrecording=false;
+        System.out.println("stopped recording");
+
         ttt="";
         arr="";
         startTime = System.currentTimeMillis();
@@ -355,8 +449,8 @@ public class MainActivity extends AppCompatActivity implements IACRCloudListener
     public void minimize(){
         CardView card=(CardView) getBubble.findViewById(R.id.card);
         LinearLayout linearLayout = (LinearLayout) getBubble.findViewById(R.id.bubbleCover);
-        linearLayout.getLayoutParams().width = 142;
-        linearLayout.getLayoutParams().height = 142;
+        linearLayout.getLayoutParams().width = ViewGroup.LayoutParams.WRAP_CONTENT;
+        linearLayout.getLayoutParams().height = ViewGroup.LayoutParams.WRAP_CONTENT;
         linearLayout.requestLayout();
         card.getLayoutParams().width =0;
         card.getLayoutParams().height = 0;
@@ -369,9 +463,15 @@ public class MainActivity extends AppCompatActivity implements IACRCloudListener
         linearLayout.getLayoutParams().height = 0;
         linearLayout.requestLayout();
         card.setVisibility(View.VISIBLE);
-        card.getLayoutParams().width = ViewGroup.LayoutParams.WRAP_CONTENT;;
-        card.getLayoutParams().height = ViewGroup.LayoutParams.WRAP_CONTENT;;
+        card.getLayoutParams().width = ViewGroup.LayoutParams.WRAP_CONTENT;
+        card.getLayoutParams().height = ViewGroup.LayoutParams.WRAP_CONTENT;
         card.requestLayout();
     }
-    
+
+    public void GoYoutube(View view) {
+        Intent intent=new Intent(Intent.ACTION_VIEW, Uri.parse("http://www.youtube.com/"+YoutubeUrl));
+        startActivity(intent);
+    }
 }
+
+

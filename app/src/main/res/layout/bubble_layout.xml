@@ -8,9 +8,12 @@
     android:clipToPadding="false"
     android:orientation="vertical"
     android:scrollbarDefaultDelayBeforeFade="400">
-
     <LinearLayout
-        android:id="@+id/bubbleCover"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/bubbleCover">
+    <LinearLayout
+        android:id="@+id/bubb"
         android:layout_width="70dp"
         android:layout_height="70dp"
         android:background="@drawable/shape">
@@ -22,9 +25,10 @@
             android:layout_marginLeft="10dp"
             android:layout_marginTop="10dp"
             android:interpolator="@android:anim/linear_interpolator"
-            android:src="@drawable/play" />
+            android:src="@drawable/play"
+            />
     </LinearLayout>
-
+    </LinearLayout>
     <com.nex3z.notificationbadge.NotificationBadge
         android:id="@+id/count"
         android:layout_width="4dp"
@@ -72,7 +76,8 @@
                             android:layout_height="55dp"
                             android:contentDescription="ThumbNail"
                             android:scaleType="centerCrop"
-                            android:src="@drawable/thumbnail" />
+                            android:src="@drawable/thumbnail"
+                            android:id="@+id/thumbnail"/>
                     </androidx.cardview.widget.CardView>
                 </androidx.cardview.widget.CardView>
 
@@ -120,7 +125,10 @@
                     android:layout_width="60dp"
                     android:layout_height="60dp"
                     android:layout_marginRight="20dp"
-                    android:src="@drawable/youtube" />
+                    android:src="@drawable/youtube"
+                    android:clickable="true"
+                    android:onClick="GoYoutube"
+                    />
 
                 <ImageView
                     android:layout_width="50dp"
