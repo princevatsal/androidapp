@@ -135,7 +135,9 @@
                     android:layout_height="50dp"
                     android:layout_marginTop="5dp"
                     android:layout_marginRight="15dp"
-                    android:src="@drawable/spotify" />
+                    android:src="@drawable/spotify"
+                    android:clickable="true"
+                    android:onClick="goSpotify"/>
 
                 <ImageView
                     android:layout_width="55dp"

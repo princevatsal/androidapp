@@ -78,6 +78,7 @@ public class MainActivity extends AppCompatActivity implements IACRCloudListener
     private boolean initState = false;
     private String path = "";
     public String YoutubeUrl="";
+    public String SpotifySearchTerm="";
     BubbleLayout getBubble;
 
     //
@@ -304,6 +305,9 @@ public class MainActivity extends AppCompatActivity implements IACRCloudListener
             JSONObject j = new JSONObject(result);
             JSONObject j1 = j.getJSONObject("status");
             int j2 = j1.getInt("code");
+            System.out.println("code:-");
+            System.out.println(j2);
+            //3003
             if(j2 == 0){
                 JSONObject metadata = j.getJSONObject("metadata");
                 //
@@ -348,6 +352,7 @@ public class MainActivity extends AppCompatActivity implements IACRCloudListener
         if(ttt!="Not")
         {
             final String localttt=ttt;
+            SpotifySearchTerm=ttt;
         RequestQueue queue = Volley.newRequestQueue(this);
         String query=ttt+" by "+arr;
         System.out.println("searching for query:-");
@@ -385,7 +390,7 @@ public class MainActivity extends AppCompatActivity implements IACRCloudListener
                             System.out.println(url);
                             //setting text
 //                          mResult.setText(title);
-                            titlebtn.setText(title);
+                            titlebtn.setText(localttt);
                             artistbtn.setText("");
                             //setting img
                             System.out.println(localttt);
@@ -424,6 +429,7 @@ public class MainActivity extends AppCompatActivity implements IACRCloudListener
             System.out.println("seeting 404 ");
             thumbnail.setImageResource(R.drawable.notfound);
             YoutubeUrl="";
+            SpotifySearchTerm="";
             maximize();
             titlebtn.setText("Not");
             artistbtn.setText("Found");
@@ -470,6 +476,11 @@ public class MainActivity extends AppCompatActivity implements IACRCloudListener
 
     public void GoYoutube(View view) {
         Intent intent=new Intent(Intent.ACTION_VIEW, Uri.parse("http://www.youtube.com/"+YoutubeUrl));
+        startActivity(intent);
+    }
+
+    public void goSpotify(View view) {
+        Intent intent=new Intent(Intent.ACTION_VIEW, Uri.parse("https://open.spotify.com/search/"+SpotifySearchTerm));
         startActivity(intent);
     }
 }
